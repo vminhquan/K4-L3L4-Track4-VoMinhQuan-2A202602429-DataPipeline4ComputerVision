@@ -1,7 +1,5 @@
 # REPORT — Lab Day 9
 
-> Điền **bằng lời và số liệu của chính bạn** (lấy từ đầu ra của `scripts/lab.sh step ...` và từ `report/evidence/*.json`). Bài làm công khai trên GitHub; giảng viên đối chiếu với lịch sử commit và với bài của các bạn khác. Mỗi câu 3 đến 8 dòng là đủ.
-
 | | |
 |---|---|
 | Họ và tên | Võ Minh Quân |
@@ -91,12 +89,34 @@ Ba nút thắt đầu tiên là: (1) FFmpeg giải mã video trong một contain
 
 ## Câu hỏi riêng của bạn trên Metabase
 
-Câu SQL bạn thêm vào dashboard và điều nó cho biết:
+Dashboard Metabase chạy trên cổng `3001` ở máy thực hiện vì cổng `3000` đã có ứng dụng khác sử dụng. Hai câu SQL dưới đây đã được lưu thành thẻ trên dashboard; ảnh chụp là `report/screenshots/metabase_dashboard.png`.
 
-(trả lời ở đây)
+**Trip nào mất nhiều frame nhất theo tỷ lệ?** Tôi thêm câu SQL trên mart đã nạp vào Postgres:
+
+```sql
+SELECT drive_id, trip_id, frames, frames_kept,
+       ROUND(100.0 * (frames - frames_kept) / NULLIF(frames, 0), 1) AS drop_pct
+FROM marts.mart_trip_summary
+ORDER BY drop_pct DESC, trip_id
+LIMIT 8;
+```
+
+Đứng đầu là `drive_a / trip-04622`: **34/60 frame bị loại (56,7%)**. Truy vấn chi tiết Silver cho thấy cả 34 frame này có cờ `is_near_dup`, không có frame đen, mờ hay mất đồng bộ; vì vậy nên xem đoạn camera đứng hình hoặc xe đi chậm trước khi chỉnh ngưỡng dHash.
+
+**Câu hỏi vận hành thứ hai (bonus): nhóm tốc độ nào bị loại frame nhiều hơn?**
+
+```sql
+SELECT CASE WHEN avg_speed_kmh < 30 THEN '<30 km/h'
+            WHEN avg_speed_kmh < 60 THEN '30-59 km/h'
+            ELSE '>=60 km/h' END AS speed_band,
+       COUNT(*) AS trips, SUM(frames) AS frames, SUM(frames_kept) AS kept,
+       ROUND(100.0 * (SUM(frames) - SUM(frames_kept)) / NULLIF(SUM(frames), 0), 1) AS drop_pct
+FROM marts.mart_trip_summary
+GROUP BY 1 ORDER BY 1;
+```
+
+Nhóm dưới 30 km/h có **29,3%** frame bị loại (256 frame, giữ 181), so với **17,9%** ở 30–59 km/h và **13,8%** ở từ 60 km/h. Đây là tương quan trên 26 trip, chưa chứng minh tốc độ là nguyên nhân; ánh sáng và cảnh cũng có thể ảnh hưởng.
 
 ## Nhìn lại
 
-Điều bạn thấy bất ngờ nhất, điều gì còn chưa rõ, và một lỗi dữ liệu mà bạn nghĩ pipeline **chưa** bắt được (nếu có). Tối đa 8 dòng.
-
-(trả lời ở đây)
+Quan sát đáng chú ý nhất là drive B có 61 khung tối nhưng vẫn giữ được trong dataset; loại mọi ảnh thiếu sáng sẽ làm dữ liệu kém đại diện. Tôi muốn hiểu sâu hơn cách chọn ngưỡng dHash theo tốc độ và loại đường, vì một ngưỡng 2 bit cố định có thể không tối ưu cho mọi cảnh. Pipeline hiện kiểm tra miền tốc độ và khoảng đồng bộ, nhưng chưa thấy kiểm tra bước nhảy GPS vô lý giữa hai mẫu liên tiếp dù từng điểm GPS riêng lẻ vẫn hợp lệ; đây là phép thử tôi muốn bổ sung khi mở rộng hệ thống.
