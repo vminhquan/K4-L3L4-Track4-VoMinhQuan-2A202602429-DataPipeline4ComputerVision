@@ -4,10 +4,10 @@
 
 | | |
 |---|---|
-| Họ và tên | `<điền>` |
-| MSSV (đúng bằng `LAB_STUDENT_ID` trong `.env`) | `<điền>` |
-| GitHub | `<điền: tên tài khoản>` |
-| Trip dùng cho bài tập sập và chạy lại (xem GUIDE, bước 5) | `<điền: trip-xxxxx>` |
+| Họ và tên | Võ Minh Quân |
+| MSSV (đúng bằng `LAB_STUDENT_ID` trong `.env`) | `2A202602429` |
+| GitHub | `vminhquan` |
+| Trip dùng cho bài tập sập và chạy lại (xem GUIDE, bước 5) | `trip-02086` (lấy phần số `202602429` của MSSV: `202602429 % 26 = 3`, phần tử thứ 4 trong danh sách trip đã sắp xếp) |
 
 ## Kết quả cuối
 
@@ -21,7 +21,7 @@
 ### Câu 1
 Liệt kê **ít nhất 4 khác biệt** giữa telemetry nguồn A và nguồn B mà bạn thấy ở bronze. Vì sao pipeline giữ **mỗi nguồn một bảng bronze** và để mọi cột ở dạng chữ, thay vì gộp và ép kiểu ngay?
 
-(trả lời ở đây)
+Nguồn A có các cột `ts_utc`, `speed_mps`, `heading_deg`, `lat`, `lon`, `gas`, `brake`; nguồn B tương ứng dùng `timestamp_ms`, `spd_kmh`, `hdg`, `latitude`, `longitude`, `throttle_pct`, `brake_pct`. A ghi thời gian ISO UTC và tốc độ m/s; B ghi epoch mili giây, tốc độ km/h, bàn đạp theo phần trăm, đồng hồ nhanh hơn video 1.500 ms. Hai bảng Bronze riêng giữ nguyên schema và giá trị gốc để có thể truy vết, nạp lại theo SHA-256, cũng như điều chỉnh quy tắc chuẩn hóa mà không mất thông tin thô. Cột dạng chữ giữ được cả ô trống và giá trị lỗi để Silver phân loại vào quarantine.
 
 ## Bước 2 · Silver telemetry
 
@@ -80,7 +80,7 @@ Mô tả chính xác điều xảy ra khi trip của bạn sập rồi chạy l�
 ### Câu 10
 Nâng từ 2 drive lên **500 xe mỗi ngày**: ba thành phần nào của pipeline này sẽ vỡ đầu tiên, và bạn thay bằng gì (nối với slide 12, 22, 23)?
 
-(trả lời ở đây)
+Ba nút thắt đầu tiên là: (1) FFmpeg giải mã video trong một container Airflow, với `max_active_tis_per_dagrun=1` cho các trip, khiến thời gian xử lý tăng gần tuyến tính; tôi sẽ tách thành job trên nhiều worker và giới hạn tải theo hàng đợi. (2) DuckDB/dbt chạy trên một file và một máy, không phù hợp với nhiều nguồn ghi và biến đổi đồng thời; tôi sẽ chuyển phép biến đổi lớn sang một engine phân tán, giữ các kiểm tra chất lượng trước khi publish. (3) Việc xuất nhiều ảnh JPEG và ghi manifest/Delta từng đối tượng lên MinIO tạo áp lực I/O, số lượng object và metadata; tôi sẽ lưu theo partition, gom file hợp lý, đặt chính sách vòng đời và phân tách luồng phục vụ dashboard khỏi luồng tạo dataset. Cần đo thời gian, thông lượng và tài nguyên ở từng bước trước khi chọn số worker.
 
 ## Câu hỏi riêng của bạn trên Metabase
 
