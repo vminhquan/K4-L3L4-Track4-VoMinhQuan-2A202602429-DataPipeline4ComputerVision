@@ -70,19 +70,19 @@ Trong **1.020 khung** hợp lệ thuộc **26 trip**, chia ngẫu nhiên theo fr
 ### Câu 7
 Vì sao `dataset_version` là **băm nội dung** chứ không phải ngày giờ hay số đếm? Hai lần chạy liên tiếp cho kết quả gì? Vì sao `dataset_version` của bạn **khác** bạn bè dù cùng dữ liệu (liên hệ MSSV)?
 
-(trả lời ở đây)
+`dataset_version` là 12 ký tự đầu của SHA-256 tính từ danh sách `frame_id|split` đã sắp xếp. Cùng nội dung cho cùng mã, nên có thể kiểm tra lại và tra cứu chính xác dataset đã dùng; ngày giờ hoặc số lần chạy sẽ đổi dù ảnh và split không đổi. Lần xuất Gold đầu và lần `export-dataset` kế tiếp đều cho **`fffdeb8d8f2a`**, 1.020 frame, train/val/test **738/129/153**. `LAB_STUDENT_ID=2A202602429` được đưa vào `md5(trip_id || MSSV)` khi xếp trip; MSSV khác làm trip vào split khác, thay chuỗi băm dù video đầu vào giống nhau.
 
 ### Câu 8
 Đọc phần `lineage` trong `manifest.json` của dataset bạn. Trả lời "dataset này được tạo từ dữ liệu nào?" bằng chính nội dung đó. Nếu một người hỏi 3 tháng sau, thông tin nào giúp tái tạo lại đúng dataset này?
 
-(trả lời ở đây)
+Manifest cuối của `fffdeb8d8f2a` ghi nguồn `bronze.raw_telemetry_a` v0, `bronze.raw_telemetry_b` v0, `bronze.trips_raw` v0, `bronze.video_files` v1; các bảng trung gian `silver.frames` v25, `silver.telemetry` v0, `silver.frames_flagged` v0 và `silver.frame_telemetry` v0. Video A có SHA-256 `636ba1a98dfc5ba665d1c935e1d2064e69f4df360ff9ffbd15795957d5e7e9aa`, video B là `bfa62703f645ff77a8578ae3fc74a00881140d38a404d43c8e2af265bbee9fdc`. Để tái tạo sau 3 tháng cần đúng các file đầu vào (kiểm SHA-256), phiên bản bảng Delta, mã và cấu hình lọc/split, cùng MSSV `2A202602429`. Manifest còn ghi quy tắc loại frame xấu, split theo trip và SHA-256 của `manifest.parquet` là `a396a2124824ec31d9fbd3f6f5bacb666f5ebb8001c4f3ff93b4a4995aa7d30c` để đối chiếu đầu ra.
 
 ## Bước 5 · Điều phối và phục vụ
 
 ### Câu 9
 Mô tả chính xác điều xảy ra khi trip của bạn sập rồi chạy lại: bao nhiêu task chuyển đỏ, bao nhiêu task `upstream_failed`, bạn clear gì, dữ liệu có nhân đôi không, `dataset_version` có đổi không? Bằng chứng (ảnh, số) là gì?
 
-(trả lời ở đây)
+Với `LAB_FAIL_ONCE=trip-02086`, đúng **1 task đỏ** là `silver_frames[3]` (map index 3); log ghi `RuntimeError: simulated crash while extracting trip-02086`. **7 task downstream** chuyển `upstream_failed`, còn 29 task đã thành công. Tôi chọn **chỉ task đỏ** trong giao diện và dùng Clear and Retry; hộp thoại cho thấy **8 task bị ảnh hưởng** gồm task đó và 7 task phụ thuộc. `silver_frames[3]` thành công ở lần thử thứ **2**, DAG trở lại **37/37 task xanh**. Kiểm tra sau retry vẫn **27/27**, Silver có 1.246 `frame_id` duy nhất, Gold có 1.020 frame; `dataset_version` giữ **`fffdeb8d8f2a`**. Bằng chứng: `fail_task_log.png`, `airflow_retry_graph.png` và `report/verify.txt`.
 
 ### Câu 10
 Nâng từ 2 drive lên **500 xe mỗi ngày**: ba thành phần nào của pipeline này sẽ vỡ đầu tiên, và bạn thay bằng gì (nối với slide 12, 22, 23)?
